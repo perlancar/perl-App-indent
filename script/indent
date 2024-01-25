@@ -1,0 +1,187 @@
+#!perl
+
+use 5.010001;
+use strict;
+use warnings;
+
+use Getopt::Long;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
+
+my $indent_opts = {
+    indent => "    ",
+};
+
+my %Opts = (
+    #indent => "    ",
+    #first_line => undef,
+    #first_line_of_para => undef,
+    #subsequent_lines => undef,
+    #indent_blank_lines => 1,
+);
+
+sub parse_cmdline {
+    Getopt::Long::Configure("gnu_getopt", "no_ignore_case");
+    my $res = GetOptions(
+        'indent|i=s' => \$indent_opts->{indent},
+        'first-line|f=s' => \$indent_opts->{first_line_indent},
+        'first-line-of-para|p=s' => \$indent_opts->{first_line_of_para_indent},
+        'subsequent-lines|s=s' => \$indent_opts->{subsequent_lines_indent},
+        'no-indent-blank-lines|B' => sub { $indent_opts->{indent_blank_lines} = 0 },
+        'version|v' => sub {
+            print "indent version ", ($main::VERSION // 'dev'), "\n";
+            exit 0;
+        },
+        'help|h'           => sub {
+            print <<USAGE;
+Usage:
+  indent [OPTIONS]... [FILE]...
+  indent --help, -h
+  indent --version, -v
+Options:
+  --first-line, -f
+  --first-line-of-para, -p
+  --subsequent-lines, -s
+  --no-indent-blank-lines, -B
+For more details, see the manpage/documentation.
+USAGE
+            exit 0;
+        },
+    );
+    exit 99 if !$res;
+}
+
+# MAIN
+
+parse_cmdline();
+$/ = undef;
+require String::Indent;
+print String::Indent::indent($indent_opts->{indent}, (scalar <>), $indent_opts);
+
+1;
+# ABSTRACT: Non-adjacent uniq
+# PODNAME:
+
+=head1 SYNOPSIS
+
+ nauniq [OPTION]... [INPUT [OUTPUT]]
+
+
+=head1 DESCRIPTION
+
+C<nauniq> is similar to the Unix command C<uniq> but detects repeated lines even
+if they are not adjacent. To do this, C<nauniq> must remember the lines being
+fed to it. It's basically a glorified form of something like these:
+
+ % awk '!mem[$0]++' INPUT
+ % perl -ne'print unless $mem{$_}++' INPUT
+
+There are options to control memory usage: option to only remember a certain
+number of unique lines, option to remember a certain number of characters for
+each line, and option to only remember the MD5 hash (instead of the content) of
+each line. There are also other options like append, forget, and so on.
+
+
+=head1 OPTIONS
+
+=over
+
+=item * --repeated, -d
+
+Print only duplicate lines. The opposite of C<--unique>.
+
+=item * --ignore-case, -i
+
+Ignore case.
+
+=item * --num-entries=N
+
+Number of unique entries to remember. The default is -1 (unlimited). This option
+is to control memory usage, but the consequence is that lines that are too far
+apart will be forgotten.
+
+=item * --skip-chars=N, -s
+
+Number of characters from the beginning of line to skip when checking
+uniqueness.
+
+=item * --unique, -u
+
+Print only unique lines. This is the default. The opposite of C<--repeated>.
+
+=item * --check-chars=N, -w
+
+The amount of characters to check for uniqueness. The default is -1 (check all
+characters in a line).
+
+=item * --append
+
+Open output file in append mode. See also C<-a>.
+
+=item * -a
+
+Equivalent to C<--append --read-output>.
+
+=item * --forget-pattern=S
+
+This is an alternative to C<--num-entries>. Instead of instructing C<nauniq> to
+remember only a fixed number of entries, you can specify a regex pattern to
+trigger the forgetting the lines. An example use-case of this is when you have a
+file like this:
+
+ * entries for 2014-03-13
+ foo
+ bar
+ baz
+ * entries for 2014-03-14
+ foo
+ baz
+
+and you want unique lines for each day (in which you'll specify
+C<--forget-pattern '^\*'>).
+
+=item * --md5
+
+Remember the MD5 hash instead of the actual characters of the line. Might be
+useful to reduce memory usage if the lines are long.
+
+=item * --read-output
+
+Whether to read output file first. This option works only with C<--append> and
+is usually used via C<-a> to append lines to file if they do not exist yet in
+the file.
+
+=back
+
+
+=head1 EXIT CODES
+
+0 on success.
+
+255 on I/O error.
+
+99 on command-line options error.
+
+
+=head1 FAQ
+
+=head2 How do I append lines to a file only if they do not exist in the file?
+
+You cannot do this with C<uniq>:
+
+ % ( cat FILE ; produce-lines ) | uniq - FILE
+ % ( cat FILE ; produce-lines ) | uniq >> FILE
+
+as it will clobber the file first. But you can do this with C<nauniq>:
+
+ % produce-lines | nauniq -a - FILE
+
+
+=head1 SEE ALSO
+
+L<uniq>
+
+=cut
